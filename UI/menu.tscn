@@ -1,0 +1,22 @@
+[gd_scene format=3 uid="uid://c0vjk32ov3msh"]
+
+[ext_resource type="Script" uid="uid://c0q6bi8e1q1tr" path="res://UI/menu.gd" id="1_g4jtw"]
+
+[node name="Menu" type="Control" unique_id=294230900]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_g4jtw")
+
+[node name="Button" type="Button" parent="." unique_id=2030554429]
+layout_mode = 0
+offset_left = 491.0
+offset_top = 284.0
+offset_right = 652.0
+offset_bottom = 390.0
+text = "Play"
+
+[connection signal="pressed" from="Button" to="." method="_on_button_pressed"]

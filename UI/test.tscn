@@ -1,0 +1,29 @@
+[gd_scene format=3 uid="uid://v2r33jkyo8sc"]
+
+[ext_resource type="Script" uid="uid://csa8kt0k3bt42" path="res://UI/test.gd" id="1_doe6o"]
+
+[node name="Test" type="Node2D" unique_id=702179789]
+script = ExtResource("1_doe6o")
+
+[node name="TextEdit" type="TextEdit" parent="." unique_id=1089112346]
+offset_left = 57.0
+offset_top = 204.0
+offset_right = 525.0
+offset_bottom = 443.0
+placeholder_text = "Server message"
+
+[node name="Button" type="Button" parent="." unique_id=393807515]
+offset_left = 199.0
+offset_top = 454.0
+offset_right = 366.0
+offset_bottom = 530.0
+text = "Send"
+
+[node name="TextEdit2" type="TextEdit" parent="." unique_id=69434087]
+offset_left = 583.0
+offset_top = 204.0
+offset_right = 1065.0
+offset_bottom = 443.0
+placeholder_text = "Server response"
+
+[connection signal="pressed" from="Button" to="." method="_on_send"]
