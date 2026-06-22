@@ -1,38 +1,38 @@
 class_name HexRenderer
 extends RefCounted
-## Renderizado visual de hexágonos: creación de nodos, highlighting y niebla.
+## Visual rendering of hexagons: node creation, highlighting, and fog.
 ##
-## Nodo-per-hex: cada hex es un Area2D con hijos Bg/Border/Highlight/Fog.
-## Soporta iconos, texturas, animaciones, overlays y señales cell_pressed/cell_released.
-## Para mapas grandes (200×200+) sin iconos/texturas, usar [HexBatchRenderer] directo.
+## Node-per-hex: each hex is an Area2D with Bg/Border/Highlight/Fog children.
+## Supports icons, textures, animations, overlays, and cell_pressed/cell_released signals.
+## For large maps (200x200+) without icons/textures, use [HexBatchRenderer] directly.
 ##
-## Visuals del nodo-per-hex — hijos del Area2D "Hex_X_Y":
-##   "Bg"        → fondo de terreno (Polygon2D, Sprite2D o AnimatedSprite2D).
-##   "Border"    → borde Line2D.
-##   "Highlight" → overlay de alcance/selección (oculto por defecto).
-##   "Fog"       → overlay de niebla (visible por defecto — llamar update_fog() para actualizar).
-##   "CellIcon"  → Label opcional si cell_icon_fn está inyectado.
+## Node-per-hex visuals — children of the "Hex_X_Y" Area2D:
+##   "Bg"        → terrain background (Polygon2D, Sprite2D, or AnimatedSprite2D).
+##   "Border"    → Line2D border.
+##   "Highlight" → range/selection overlay (hidden by default).
+##   "Fog"       → fog overlay (visible by default — call update_fog() to update).
+##   "CellIcon"  → optional Label if cell_icon_fn is injected.
 ##
-## Todos los Callables son opcionales — omitir los que no se necesitan.
+## All Callables are optional — omit the ones that are not needed.
 
-## Emitidas por hex en modo nodo-per-hex (no batch). El consumidor filtra
-## por botón (event.button_index == MOUSE_BUTTON_LEFT) si necesita restringir.
-## Acepta mouse y touch (InputEventScreenTouch).
-## Si el usuario presiona dentro del hex y suelta fuera, cell_released puede no
-## emitirse desde ese hex (comportamiento estándar de Area2D.input_event).
-## No asumir que cada cell_pressed tiene su cell_released pareado en el mismo coord.
+## Emitted per hex in node-per-hex mode (not batch). The consumer filters
+## by button (event.button_index == MOUSE_BUTTON_LEFT) if it needs to restrict.
+## Accepts mouse and touch (InputEventScreenTouch).
+## If the user presses inside the hex and releases outside, cell_released might not
+## be emitted from that hex (standard Area2D.input_event behavior).
+## Do not assume that every cell_pressed has its paired cell_released on the same coord.
 signal cell_pressed(coord: Vector2i, event: InputEvent)
 signal cell_released(coord: Vector2i, event: InputEvent)
 
 const DEFAULT_ICON_OFFSET := Vector2(-6, -6)
 const DEFAULT_ICON_FONT_SIZE := 12
 
-## Estrategia de dibujo usada por render_edges().
-##   CENTERS — Line2D del centro de un hex al centro del otro (default, backward-compat).
-##             Útil para "caminos", "ríos navegables" o conexiones que cruzan ambos hex.
-##   SHARED_BORDER — Segmento centrado en el borde compartido, perpendicular a la línea
-##                   centro-a-centro y de longitud HEX_SIZE. Útil para "muros", "fronteras"
-##                   u obstáculos que separan dos hex sin cubrir ninguno.
+## Drawing strategy used by render_edges().
+##   CENTERS — Line2D from the center of one hex to the center of the other (default, backward-compat).
+##             Useful for "roads", "navigable rivers", or connections that cross both hexes.
+##   SHARED_BORDER — Segment centered on the shared border, perpendicular to the
+##                   center-to-center line and of length HEX_SIZE. Useful for "walls", "borders"
+##                   or obstacles that separate two hexes without covering either.
 enum EdgeRenderMode { CENTERS, SHARED_BORDER }
 
 var _palette: HexPalette
@@ -47,9 +47,9 @@ var icon_offset: Vector2 = DEFAULT_ICON_OFFSET
 var icon_font_size: int = DEFAULT_ICON_FONT_SIZE
 
 
-## [param palette]: paleta de colores y resolver. Si null, usa [code]HexPalette.new()[/code] (defaults).
-## [param hex_size]: tamaño del hex en pixels (radio circunscripto).
-## [param callables]: dict opcional con keys: cell_icon_fn, tile_visual_fn, texture_fn,
+## [param palette]: color palette and resolver. If null, uses [code]HexPalette.new()[/code] (defaults).
+## [param hex_size]: hex size in pixels (circumscribed radius).
+## [param callables]: optional dict with keys: cell_icon_fn, tile_visual_fn, texture_fn,
 ## animation_fn, overlay_fn, fog_material, icon_offset, icon_font_size.
 func _init(
 		palette: HexPalette = null,
@@ -88,9 +88,9 @@ static func get_visual_part(container: Node2D, coord: Vector2i, part_name: Strin
 	return result
 
 
-## Crea el Area2D visual para [param cell] en [param pixel] y lo agrega a [param hex_container].
-## El nodo se nombra "Hex_X_Y" y contiene Bg, Border, Highlight, Fog y opcionalmente CellIcon.
-## Conecta Area2D.input_event → cell_pressed / cell_released.
+## Creates the visual Area2D for [param cell] at [param pixel] and adds it to [param hex_container].
+## The node is named "Hex_X_Y" and contains Bg, Border, Highlight, Fog, and optionally CellIcon.
+## Connects Area2D.input_event → cell_pressed / cell_released.
 func create_hex_visual(hex_container: Node2D, coord: Vector2i, pixel: Vector2, cell: HexCell) -> void:
 	var hex_area := Area2D.new()
 	hex_area.position = pixel
@@ -249,8 +249,8 @@ func _as_bg(fallback: Polygon2D) -> Node2D:
 	return fallback
 
 
-## Muestra el overlay Highlight en los hexes del set [param reachable] y oculta el resto.
-## [param highlighted_hexes] se usa como cache mutable — pasar el mismo Dictionary entre llamadas.
+## Shows the Highlight overlay on the hexes in the [param reachable] set and hides the rest.
+## [param highlighted_hexes] is used as a mutable cache — pass the same Dictionary between calls.
 func update_reachable_highlight(hex_container: Node2D, grid: HexGrid, reachable: Dictionary, highlighted_hexes: Dictionary) -> void:
 	_clear_highlights(hex_container, highlighted_hexes)
 
@@ -272,8 +272,8 @@ func _clear_highlights(hex_container: Node2D, highlighted_hexes: Dictionary) -> 
 				highlight.visible = false
 
 
-## Colorea el overlay Highlight según LOS: azul para visibles, rojo para bloqueados.
-## [param visible_color] y [param blocked_color] son opcionales — usar los defaults para UI estándar.
+## Colors the Highlight overlay based on LOS: blue for visible, red for blocked.
+## [param visible_color] and [param blocked_color] are optional — use defaults for standard UI.
 func update_los_highlight(hex_container: Node2D,
 		visible_coords: Array[Vector2i],
 		blocked_coords: Array[Vector2i] = [],
@@ -294,19 +294,19 @@ func _apply_los_color(hex_container: Node2D, coords: Array[Vector2i], color: Col
 			h.visible = true
 
 
-## Actualiza el overlay Fog de todos los hexes según el estado de niebla de [param player_id].
-## Recorre todo el grid — llamar solo cuando el estado cambia (no cada frame).
-## Para actualizaciones incrementales, conectar FogOfWar.fog_changed y llamar
-## [method update_cell_fog] solo para las celdas modificadas (O(1) por celda).
+## Updates the Fog overlay of all hexes based on the fog state of [param player_id].
+## Traverses the entire grid — call only when the state changes (not every frame).
+## For incremental updates, connect FogOfWar.fog_changed and call
+## [method update_cell_fog] only for the modified cells (O(1) per cell).
 func update_fog(hex_container: Node2D, grid: HexGrid, player_id: int = 0) -> void:
 	var all_cells := grid.get_all_cells()
 	for coord in all_cells:
 		update_cell_fog(hex_container, coord, all_cells[coord], player_id)
 
 
-## Actualiza overlay Fog/Bg/Border/CellIcon de una sola celda según su FogState.
-## Pensado para ser invocado desde un handler de FogOfWar.fog_changed (O(1)),
-## evitando el barrido O(N) de [method update_fog].
+## Updates Fog/Bg/Border/CellIcon overlay of a single cell based on its FogState.
+## Intended to be invoked from a FogOfWar.fog_changed handler (O(1)),
+## avoiding the O(N) sweep of [method update_fog].
 func update_cell_fog(hex_container: Node2D, coord: Vector2i, cell: HexCell, player_id: int = 0) -> void:
 	var node := get_visual_for(hex_container, coord)
 	if not node:
@@ -354,9 +354,9 @@ func _set_node_visibility(node: CanvasItem, visible: bool, color: Color) -> void
 		poly.color = color
 
 
-## Reemplaza el nodo Bg de la celda en [param coord] con uno nuevo basado en [param cell].
-## Más costoso que refresh_cell_color() — usar cuando el tipo de visual cambia
-## (ej. terreno que pasa de Polygon2D a Sprite2D). Para solo cambiar color, usar refresh_cell_color().
+## Replaces the Bg node of the cell at [param coord] with a new one based on [param cell].
+## More expensive than refresh_cell_color() — use when the visual type changes
+## (e.g., terrain changing from Polygon2D to Sprite2D). To only change color, use refresh_cell_color().
 func update_cell_visual(hex_container: Node2D, coord: Vector2i, cell: HexCell) -> void:
 	var node := get_visual_for(hex_container, coord)
 	if not node:
@@ -372,9 +372,9 @@ func update_cell_visual(hex_container: Node2D, coord: Vector2i, cell: HexCell) -
 	node.move_child(new_bg, 0)
 
 
-## Fast-path para repintado de color sin recrear el nodo Bg.
-## Usa color_fn si está inyectado, sino terrain_colors. Polygon2D recibe
-## .color directo; Sprite2D/AnimatedSprite2D reciben .modulate.
+## Fast-path for color repainting without recreating the Bg node.
+## Uses color_fn if injected, otherwise terrain_colors. Polygon2D receives
+## .color directly; Sprite2D/AnimatedSprite2D receive .modulate.
 func refresh_cell_color(hex_container: Node2D, coord: Vector2i, cell: HexCell) -> void:
 	var bg := get_visual_part(hex_container, coord, "Bg")
 	if not bg:
@@ -386,9 +386,9 @@ func refresh_cell_color(hex_container: Node2D, coord: Vector2i, cell: HexCell) -
 		bg.modulate = color
 
 
-## Dibuja todos los edges del grid como Line2D en [param edge_container].
-## Limpia los hijos anteriores antes de dibujar — llamar después de set_edge() si cambiaron.
-## [param mode] controla la geometría del segmento: CENTERS (default) o SHARED_BORDER.
+## Draws all edges of the grid as Line2D in [param edge_container].
+## Clears previous children before drawing — call after set_edge() if they changed.
+## [param mode] controls the segment geometry: CENTERS (default) or SHARED_BORDER.
 func render_edges(edge_container: Node2D, grid: HexGrid, edge_color: Color = Color(0.2, 0.5, 0.8, 0.8), edge_width: float = 2.0, mode: EdgeRenderMode = EdgeRenderMode.CENTERS) -> void:
 	for child in edge_container.get_children():
 		child.queue_free()
@@ -420,9 +420,9 @@ func render_edges(edge_container: Node2D, grid: HexGrid, edge_color: Color = Col
 		edge_container.add_child(line)
 
 
-# Endpoints del Line2D según modo. SHARED_BORDER usa el midpoint del par de centros
-# y el vector perpendicular al segmento centro-a-centro; la longitud (_hex_size) corresponde
-# al lado del hex regular pointy-top (que coincide con el radio centro→vértice).
+# Line2D endpoints according to mode. SHARED_BORDER uses the midpoint of the pair of centers
+# and the vector perpendicular to the center-to-center segment; the length (_hex_size) corresponds
+# to the side of the regular pointy-top hex (which matches the center→vertex radius).
 func _compute_edge_endpoints(a: Vector2i, b: Vector2i, mode: EdgeRenderMode) -> Array:
 	var pixel_a := HexGrid.offset_to_pixel(a, _hex_size)
 	var pixel_b := HexGrid.offset_to_pixel(b, _hex_size)
@@ -436,9 +436,9 @@ func _compute_edge_endpoints(a: Vector2i, b: Vector2i, mode: EdgeRenderMode) -> 
 
 
 
-## Crea un ShaderMaterial con el shader de fog incluido en el addon.
-## Útil como punto de partida — el consumidor puede modificar los uniforms antes de pasarlo al renderer.
-## Retorna null si el shader no se encuentra (ej. addon instalado en ruta no estándar).
+## Creates a ShaderMaterial with the fog shader included in the addon.
+## Useful as a starting point — the consumer can modify the uniforms before passing it to the renderer.
+## Returns null if the shader is not found (e.g., addon installed in a non-standard path).
 static func create_default_fog_material() -> ShaderMaterial:
 	var shader := load("res://addons/hex_strategy_map/fog_overlay.gdshader")
 	if not shader:

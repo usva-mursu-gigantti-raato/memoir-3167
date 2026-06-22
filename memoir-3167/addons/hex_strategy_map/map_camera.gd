@@ -1,39 +1,39 @@
 class_name MapCamera
 extends RefCounted
-## Controlador de cámara para mapas hexagonales.
+## Camera controller for hexagonal maps.
 ##
-## Envuelve un Camera2D de Godot y agrega follow, drag con botón derecho,
-## zoom con scroll, y edge-scroll (la cámara se mueve cuando el mouse
-## llega al borde de la pantalla).
+## Wraps a Godot Camera2D and adds follow, right-button drag,
+## scroll zoom, and edge-scroll (the camera moves when the mouse
+## reaches the edge of the screen).
 ##
-## Uso típico:
+## Typical usage:
 ##   cam_ctrl = MapCamera.new(camera, get_viewport())
-##   # en _process:   cam_ctrl.process(delta, target_pos)
-##   # en _unhandled_input: cam_ctrl.handle_input(event)
+##   # in _process:    cam_ctrl.process(delta, target_pos)
+##   # in _unhandled_input: cam_ctrl.handle_input(event)
 ##
-## Follow vs libre: follow_target = true hace lerp hacia target_position.
-## Se desactiva automáticamente al hacer drag. Reactivar con Space o
-## asignando follow_target = true desde código.
+## Follow vs free: follow_target = true lerps towards target_position.
+## Deactivates automatically when dragging. Reactivate with Space or
+## by assigning follow_target = true from code.
 
-## Referencia al Camera2D que se controla.
+## Reference to the controlled Camera2D.
 var camera: Camera2D = null
-## Viewport asociado (necesario para edge-scroll y screen_to_world).
+## Associated viewport (necessary for edge-scroll and screen_to_world).
 var viewport: Viewport = null
-## true → la cámara sigue el target_position pasado a process().
-## false → la cámara se controla con drag / edge-scroll.
+## true → the camera follows the target_position passed to process().
+## false → the camera is controlled with drag / edge-scroll.
 var follow_target: bool = true
 
-## Velocidad de interpolación del follow (lerp). Valores típicos: 4–12.
+## Follow interpolation speed (lerp). Typical values: 4–12.
 var lerp_speed: float = 8.0
-## Ancho en píxeles del borde de pantalla que activa el edge-scroll.
+## Width in pixels of the screen edge that activates edge-scroll.
 var edge_margin: float = 30.0
-## Velocidad del edge-scroll en píxeles por segundo.
+## Edge-scroll speed in pixels per second.
 var edge_speed: float = 500.0
-## Zoom mínimo permitido (alejado). Valores < 1.0 alejan la cámara.
+## Minimum allowed zoom (zoomed out). Values < 1.0 zoom out the camera.
 var zoom_min: float = 0.6
-## Zoom máximo permitido (acercado). Valores > 1.0 acercan la cámara.
+## Maximum allowed zoom (zoomed in). Values > 1.0 zoom in the camera.
 var zoom_max: float = 3.0
-## Incremento de zoom por cada tick de scroll wheel.
+## Zoom increment for each scroll wheel tick.
 var zoom_step: float = 0.15
 
 var _is_dragging: bool = false
@@ -41,8 +41,8 @@ var _drag_start: Vector2 = Vector2.ZERO
 var _camera_drag_start: Vector2 = Vector2.ZERO
 
 
-## Inicializa el controlador con la cámara y viewport del nodo raíz.
-## [param p_params] sobreescribe cualquier parámetro por su nombre:
+## Initializes the controller with the root node's camera and viewport.
+## [param p_params] overwrites any parameter by its name:
 ##   lerp_speed, edge_margin, edge_speed, zoom_min, zoom_max, zoom_step.
 func _init(p_camera: Camera2D, p_viewport: Viewport, p_params: Dictionary = {}) -> void:
 	camera = p_camera
@@ -55,9 +55,9 @@ func _init(p_camera: Camera2D, p_viewport: Viewport, p_params: Dictionary = {}) 
 	zoom_step = p_params.get("zoom_step", zoom_step)
 
 
-## Actualiza la cámara. Llamar desde _process() con el delta del frame.
-## [param target_position] es la posición mundo hacia la que lerpa cuando follow_target = true.
-## Si follow_target = false y no hay drag activo, activa el edge-scroll.
+## Updates the camera. Call from _process() with the frame delta.
+## [param target_position] is the world position to lerp towards when follow_target = true.
+## If follow_target = false and there is no active drag, activates edge-scroll.
 func process(delta: float, target_position: Vector2) -> void:
 	if follow_target:
 		camera.position = camera.position.lerp(target_position, lerp_speed * delta)
@@ -65,11 +65,11 @@ func process(delta: float, target_position: Vector2) -> void:
 		_edge_scroll(delta)
 
 
-## Procesa eventos de input. Llamar desde _unhandled_input().
-## Controles por defecto:
-##   Botón derecho drag → pan libre (desactiva follow).
-##   Scroll wheel       → zoom dentro de [zoom_min, zoom_max].
-##   Space              → reactiva follow_target.
+## Processes input events. Call from _unhandled_input().
+## Default controls:
+##   Right-button drag → free pan (deactivates follow).
+##   Scroll wheel       → zoom within [zoom_min, zoom_max].
+##   Space              → reactivates follow_target.
 func handle_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
 		_is_dragging = true
@@ -96,17 +96,17 @@ func handle_input(event: InputEvent) -> void:
 		follow_target = true
 
 
-## Convierte una posición de pantalla (píxeles) a coordenadas mundo.
-## Útil para transformar InputEventMouseButton.position al espacio del mapa.
-## Retorna Vector2.ZERO si el zoom es cero (situación inválida).
+## Converts a screen position (pixels) to world coordinates.
+## Useful for transforming InputEventMouseButton.position to map space.
+## Returns Vector2.ZERO if zoom is zero (invalid situation).
 func screen_to_world(screen_pixel: Vector2) -> Vector2:
 	if camera.zoom.x == 0.0:
 		return Vector2.ZERO
 	return screen_pixel / camera.zoom + camera.global_position - viewport.get_visible_rect().size / camera.zoom / 2.0
 
 
-## Desplaza la cámara según la posición del mouse cerca de los bordes.
-## Solo actúa si el mouse está dentro del margen definido por edge_margin.
+## Pans the camera based on the mouse position near the edges.
+## Only acts if the mouse is within the margin defined by edge_margin.
 func _edge_scroll(delta: float) -> void:
 	var mouse_pos := viewport.get_mouse_position()
 	var screen_size := viewport.get_visible_rect().size

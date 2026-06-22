@@ -1,17 +1,16 @@
 class_name HexGrid
 extends RefCounted
-## Grid hexagonal con coordenadas offset (odd-r, pointy-top).
+## Hexagonal grid with offset coordinates (odd-r, pointy-top).
 ##
-## Fuente de verdad del mapa: almacena celdas, costos de terreno y edges.
-## No sabe nada del árbol de escena — solo datos. HexRenderer consume este objeto
-## para crear los nodos visuales.
+## Map source of truth: stores cells, terrain costs, and edges.
+## Knows nothing about the scene tree — data only. HexRenderer consumes this object
+## to create visual nodes.
 ##
-## Coordenadas: offset (Vector2i) en la API pública; cube internamente para
-## distancias, vecinos y LOS. Convertir con offset_to_cube() si hace falta.
+## Coordinates: offset (Vector2i) in the public API; cube internally for
+## distances, neighbors, and LOS. Convert with offset_to_cube() if needed.
 ##
-## Terreno extensible: terrain_cost acepta cualquier int como clave — definir
-## constantes propias junto a los Terrain.* de HexCell para ampliar el sistema.
-
+## Extensible terrain: terrain_cost accepts any int as a key — define
+## custom constants alongside HexCell's Terrain.* to expand the system.
 enum EdgeType {
 	NONE,
 	RIVER,
@@ -34,9 +33,9 @@ const EDGE_COST: Dictionary = {
 	EdgeType.ROAD: -0.5,
 }
 
-## Tamaño del hex en pixels (radio del circunscripto, pointy-top odd-r).
+## Hex size in pixels (circumscribed radius, pointy-top odd-r).
 const HEX_SIZE: float = 32.0
-## sqrt(3) precalculado para la fórmula de conversión offset↔pixel (pointy-top hexes).
+## Precalculated sqrt(3) for the offset↔pixel conversion formula (pointy-top hexes).
 const HEX_SQRT3: float = 1.7320508075688772
 
 var width: int = 0
@@ -46,20 +45,20 @@ var edges: Dictionary = {}  # String (edge_key) → Dictionary { type: int, cost
 var terrain_cost: Dictionary = {}
 var edge_cost: Dictionary = {}
 var hex_size: float = 32.0
-# Mínimo costo entre los terrenos PRESENTES en cells. Lazy: se calcula
-# al primer pedido y se invalida en set_terrain/generate_cells. Computar sobre
-# terrain_cost (el dict completo) daría un mínimo más bajo que el real cuando
-# el grid sólo usa un subconjunto de terrenos, lo que mantiene la heurística
-# admisible pero floja — exactamente lo que find_path_astar quiere evitar.
+# Minimum cost among the terrains PRESENT in cells. Lazy: calculated
+# on the first request and invalidated in set_terrain/generate_cells. Computing over
+# terrain_cost (the full dict) would give a lower minimum than the real one when
+# the grid only uses a subset of terrains, which keeps the heuristic
+# admissible but loose — exactly what find_path_astar wants to avoid.
 var _min_passable_terrain_cost_cache: float = -1.0
 
 
-## Crea el grid con las dimensiones y tablas de costos indicadas.
-## [param cost_table]: int → float con el costo de cada terreno. -1.0 = intransitable.
-##   Si está vacío, usa TERRAIN_COST por defecto.
-## [param size]: radio del hex en píxeles. 0.0 → usa HEX_SIZE (32 px).
-## [param edge_cost_table]: int → float con el costo adicional de cada EdgeType.
-##   Si está vacío, usa EDGE_COST por defecto.
+## Creates the grid with the indicated dimensions and cost tables.
+## [param cost_table]: int → float with the cost of each terrain. -1.0 = impassable.
+##   If empty, uses default TERRAIN_COST.
+## [param size]: hex radius in pixels. 0.0 → uses HEX_SIZE (32 px).
+## [param edge_cost_table]: int → float with the additional cost of each EdgeType.
+##   If empty, uses default EDGE_COST.
 func _init(map_width: int = 15, map_height: int = 15, cost_table: Dictionary = {}, size: float = 0.0, edge_cost_table: Dictionary = {}) -> void:
 	if map_width <= 0 or map_height <= 0:
 		push_error("HexGrid: dimensiones inválidas (%d x %d), se usará 15x15" % [map_width, map_height])
@@ -72,8 +71,8 @@ func _init(map_width: int = 15, map_height: int = 15, cost_table: Dictionary = {
 	hex_size = size if size > 0.0 else HEX_SIZE
 
 
-## Genera las celdas del grid con [param default_terrain] en todas las posiciones.
-## Limpia cualquier celda anterior. Llamar una vez después de _init().
+## Generates the grid cells with [param default_terrain] in all positions.
+## Clears any previous cells. Call once after _init().
 func generate_cells(default_terrain: int = HexCell.Terrain.PLAINS) -> void:
 	cells.clear()
 	for y in height:
@@ -83,17 +82,17 @@ func generate_cells(default_terrain: int = HexCell.Terrain.PLAINS) -> void:
 	_min_passable_terrain_cost_cache = -1.0
 
 
-## Retorna la HexCell en [param coord], o null si la coordenada no existe.
+## Returns the HexCell at [param coord], or null if the coordinate does not exist.
 func get_cell(coord: Vector2i) -> HexCell:
 	return cells.get(coord, null)
 
 
-## Retorna el diccionario completo de celdas (Vector2i → HexCell). Solo lectura.
+## Returns the complete cell dictionary (Vector2i → HexCell). Read-only.
 func get_all_cells() -> Dictionary:
 	return cells
 
 
-## Asigna el terreno de la celda en [param coord]. Sin efecto si la coordenada no existe.
+## Sets the terrain of the cell at [param coord]. No effect if the coordinate does not exist.
 func set_terrain(coord: Vector2i, terrain: int) -> void:
 	var cell := get_cell(coord)
 	if cell:
@@ -101,27 +100,27 @@ func set_terrain(coord: Vector2i, terrain: int) -> void:
 		_min_passable_terrain_cost_cache = -1.0
 
 
-## Retorna true si [param coord] existe en el grid (fue generado por generate_cells).
+## Returns true if [param coord] exists in the grid (was generated by generate_cells).
 func is_valid(coord: Vector2i) -> bool:
 	return cells.has(coord)
 
 
-## Retorna true si la celda existe y su costo de terreno > 0 (no intransitable).
+## Returns true if the cell exists and its terrain cost > 0 (not impassable).
 func is_passable(coord: Vector2i) -> bool:
 	return _get_terrain_cost(coord) > 0
 
 
-## Retorna el costo de movimiento de entrar a [param coord].
-## Retorna -1.0 si la celda no existe o el terreno es intransitable.
+## Returns the movement cost to enter [param coord].
+## Returns -1.0 if the cell does not exist or the terrain is impassable.
 func get_movement_cost(coord: Vector2i) -> float:
 	return _get_terrain_cost(coord)
 
 
-## Mínimo costo entre los terrenos efectivamente PRESENTES en cells.
-## Lazy: se calcula al primer pedido y se invalida cuando cambia el terreno.
-## Retorna 1.0 si el grid está vacío o no tiene terrenos pasables.
-## PathFinder.find_path_astar lo usa como factor de la heurística para mantener
-## admisibilidad sin sacrificar tightness en mapas con un único terreno.
+## Minimum cost among the terrains actually PRESENT in cells.
+## Lazy: calculated on the first request and invalidated when the terrain changes.
+## Returns 1.0 if the grid is empty or has no passable terrains.
+## PathFinder.find_path_astar uses it as a heuristic factor to maintain
+## admissibility without sacrificing tightness on maps with a single terrain.
 func min_passable_terrain_cost() -> float:
 	if _min_passable_terrain_cost_cache < 0.0:
 		var min_cost := INF
@@ -133,7 +132,7 @@ func min_passable_terrain_cost() -> float:
 	return _min_passable_terrain_cost_cache
 
 
-## Costo de terreno para [param coord]. -1.0 si la celda no existe o terreno no mapeado.
+## Terrain cost for [param coord]. -1.0 if the cell does not exist or terrain is unmapped.
 func _get_terrain_cost(coord: Vector2i) -> float:
 	var cell := get_cell(coord)
 	if not cell:
@@ -141,8 +140,8 @@ func _get_terrain_cost(coord: Vector2i) -> float:
 	return terrain_cost.get(cell.terrain, -1.0)
 
 
-## Retorna el costo adicional del edge entre [param from] y [param to].
-## 0.0 si no hay edge definido entre esas celdas.
+## Returns the additional cost of the edge between [param from] and [param to].
+## 0.0 if there is no edge defined between those cells.
 func get_edge_cost(from: Vector2i, to: Vector2i) -> float:
 	var edge := get_edge(from, to)
 	return edge.get("cost", 0.0) if not edge.is_empty() else 0.0
@@ -150,17 +149,17 @@ func get_edge_cost(from: Vector2i, to: Vector2i) -> float:
 
 # --- Edges ---
 
-## Genera la clave canónica para un edge entre [param a] y [param b].
-## La clave es simétrica: edge_key(a, b) == edge_key(b, a).
+## Generates the canonical key for an edge between [param a] and [param b].
+## The key is symmetric: edge_key(a, b) == edge_key(b, a).
 static func edge_key(a: Vector2i, b: Vector2i) -> String:
 	if a.x < b.x or (a.x == b.x and a.y < b.y):
 		return "%d,%d|%d,%d" % [a.x, a.y, b.x, b.y]
 	return "%d,%d|%d,%d" % [b.x, b.y, a.x, a.y]
 
 
-## Define un edge entre [param a] y [param b] del tipo [param edge_type].
-## [param properties] puede incluir "cost" para sobreescribir el costo por defecto del EdgeType.
-## Si ya existe un edge entre esas celdas, lo reemplaza.
+## Defines an edge between [param a] and [param b] of type [param edge_type].
+## [param properties] can include "cost" to overwrite the default cost of the EdgeType.
+## If an edge already exists between those cells, it replaces it.
 func set_edge(a: Vector2i, b: Vector2i, edge_type: int, properties: Dictionary = {}) -> void:
 	var key := edge_key(a, b)
 	properties["type"] = edge_type
@@ -169,24 +168,24 @@ func set_edge(a: Vector2i, b: Vector2i, edge_type: int, properties: Dictionary =
 	edges[key] = properties
 
 
-## Retorna el Dictionary del edge entre [param a] y [param b], o {} si no existe.
-## El Dictionary incluye al menos "type" (int) y "cost" (float).
+## Returns the Dictionary of the edge between [param a] and [param b], or {} if it does not exist.
+## The Dictionary includes at least "type" (int) and "cost" (float).
 func get_edge(a: Vector2i, b: Vector2i) -> Dictionary:
 	return edges.get(edge_key(a, b), {})
 
 
-## Retorna true si hay un edge definido entre [param a] y [param b].
+## Returns true if there is an edge defined between [param a] and [param b].
 func has_edge(a: Vector2i, b: Vector2i) -> bool:
 	return edges.has(edge_key(a, b))
 
 
-## Elimina el edge entre [param a] y [param b] si existe.
+## Removes the edge between [param a] and [param b] if it exists.
 func remove_edge(a: Vector2i, b: Vector2i) -> void:
 	edges.erase(edge_key(a, b))
 
 
-## Retorna todos los edges que tienen a [param coord] como extremo.
-## Cada elemento es un Dictionary con "type", "cost", y propiedades extras.
+## Returns all edges that have [param coord] as an endpoint.
+## Each element is a Dictionary with "type", "cost", and extra properties.
 func get_edges_for(coord: Vector2i) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for neighbor in get_neighbors(coord):
@@ -200,8 +199,8 @@ func _default_edge_cost(edge_type: int) -> float:
 	return edge_cost.get(edge_type, 0.0)
 
 
-## Serializa el grid completo (dimensiones, costos, celdas, edges) a Dictionary JSON.
-## Reconstruir con HexGrid.deserialize(data).
+## Serializes the entire grid (dimensions, costs, cells, edges) to a JSON Dictionary.
+## Reconstruct with HexGrid.deserialize(data).
 func serialize() -> Dictionary:
 	var cells_data: Array = []
 	for coord in cells:
@@ -220,7 +219,7 @@ func serialize() -> Dictionary:
 	}
 
 
-## NOTA: JSON serializa int keys como strings. Se reconvierten a int aquí.
+## NOTE: JSON serializes int keys as strings. They are converted back to int here.
 static func deserialize(data: Dictionary) -> HexGrid:
 	var parsed_terrain_cost: Dictionary = {}
 	for key in data.get("terrain_cost", {}):
@@ -244,23 +243,23 @@ static func deserialize(data: Dictionary) -> HexGrid:
 	return grid
 
 
-# --- Coordenadas ---
+# --- Coordinates ---
 
-## Offset odd-r a pixel (pointy-top hexes).
+## Odd-r offset to pixel (pointy-top hexes).
 static func offset_to_pixel(coord: Vector2i, size: float = HEX_SIZE) -> Vector2:
 	var x := size * HEX_SQRT3 * (coord.x + 0.5 * (coord.y & 1))
 	var y := size * 1.5 * coord.y
 	return Vector2(x, y)
 
 
-## Pixel a offset odd-r más cercano.
+## Pixel to nearest odd-r offset.
 static func pixel_to_offset(pixel: Vector2, size: float = HEX_SIZE) -> Vector2i:
 	var q: float = (HEX_SQRT3 / 3.0 * pixel.x - 1.0 / 3.0 * pixel.y) / size
 	var r: float = (2.0 / 3.0 * pixel.y) / size
 	return _cube_to_offset(cube_round(q, r))
 
 
-## Offset a cube coordinates (para distancia y dirección).
+## Offset to cube coordinates (for distance and direction).
 static func offset_to_cube(coord: Vector2i) -> Vector3i:
 	var x := coord.x - ((coord.y - (coord.y & 1)) / 2)
 	var z := coord.y
@@ -268,15 +267,15 @@ static func offset_to_cube(coord: Vector2i) -> Vector3i:
 	return Vector3i(x, y, z)
 
 
-## Distancia hex entre dos coordenadas offset.
+## Hex distance between two offset coordinates.
 static func distance(a: Vector2i, b: Vector2i) -> int:
 	var ca := offset_to_cube(a)
 	var cb := offset_to_cube(b)
 	return maxi(absi(ca.x - cb.x), maxi(absi(ca.y - cb.y), absi(ca.z - cb.z)))
 
 
-## Retorna los 6 vértices de un hexágono pointy-top centrado en (0,0).
-## scale_factor < 1.0 encoge el polígono (útil para separación visual).
+## Returns the 6 vertices of a pointy-top hexagon centered at (0,0).
+## scale_factor < 1.0 shrinks the polygon (useful for visual separation).
 static func hex_polygon_points(size: float, scale_factor: float = 0.95) -> PackedVector2Array:
 	var pts := PackedVector2Array()
 	for i in 6:
@@ -285,9 +284,9 @@ static func hex_polygon_points(size: float, scale_factor: float = 0.95) -> Packe
 	return pts
 
 
-## Traslada los puntos de un polígono hex a una posición pixel concreta.
-## Helper extraído para evitar el patrón duplicado de `for p in pts: translated.append(p + pixel)`
-## en HexRenderer (batch), HexMiniMap, HexMapNode y FogTextureRenderer.
+## Translates the points of a hex polygon to a specific pixel position.
+## Extracted helper to avoid the duplicated pattern of `for p in pts: translated.append(p + pixel)`
+## in HexRenderer (batch), HexMiniMap, HexMapNode, and FogTextureRenderer.
 static func translated_hex_polygon(points: PackedVector2Array, pixel: Vector2) -> PackedVector2Array:
 	var result := PackedVector2Array()
 	result.resize(points.size())
@@ -296,7 +295,7 @@ static func translated_hex_polygon(points: PackedVector2Array, pixel: Vector2) -
 	return result
 
 
-## Vecinos de un hex (6 direcciones, odd-r offset).
+## Neighbors of a hex (6 directions, odd-r offset).
 static func get_neighbors(coord: Vector2i) -> Array[Vector2i]:
 	var parity := coord.y & 1
 	var dirs: Array[Vector2i]
@@ -321,14 +320,14 @@ static func get_neighbors(coord: Vector2i) -> Array[Vector2i]:
 	return dirs
 
 
-## Hexes alcanzables con una cantidad de puntos de movimiento (Dijkstra).
-## Atajo a PathFinder.find_reachable(). Retorna Dictionary[Vector2i, float]
-## con los hexes alcanzables desde [param origin] con [param movement_points].
+## Reachable hexes with a given amount of movement points (Dijkstra).
+## Shortcut to PathFinder.find_reachable(). Returns Dictionary[Vector2i, float]
+## with the reachable hexes from [param origin] using [param movement_points].
 func get_reachable_hexes(origin: Vector2i, movement_points: float) -> Dictionary:
 	return PathFinder.find_reachable(origin, movement_points, self)
 
 
-## Línea de hexes entre dos coordenadas (interpolación cube). Uso interno para line-of-sight.
+## Line of hexes between two coordinates (cube interpolation). Internal use for line-of-sight.
 static func _hex_line(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
 	var n := distance(a, b)
 	var result: Array[Vector2i] = []
@@ -348,7 +347,7 @@ static func _hex_line(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
 	return result
 
 
-# --- Internos ---
+# --- Internals ---
 
 static func cube_round(q: float, r: float) -> Vector3i:
 	var s: float = -q - r
@@ -369,7 +368,7 @@ static func _cube_to_float(c: Vector3i) -> Vector3:
 	return Vector3(float(c.x), float(c.y), float(c.z))
 
 
-## Anillo de hexes a distancia N del origen.
+## Ring of hexes at distance N from the origin.
 func get_ring(center: Vector2i, radius: int) -> Array[Vector2i]:
 	if radius == 0:
 		return [center]
@@ -404,10 +403,10 @@ static func _cube_to_offset(cube: Vector3i) -> Vector2i:
 	return Vector2i(col, row)
 
 
-## blocking_terrains vacío → ningún terreno bloquea (retorna true siempre salvo celdas inválidas).
-## [param elevation_fn]: (coord: Vector2i) → float. Si se proporciona, bloquea LOS cuando
-## un hex intermedio tiene elevación mayor a la línea de visión interpolada entre from y to.
-## Callable vacío = sin check de elevación (backward compat).
+## Empty blocking_terrains → no terrain blocks (always returns true except for invalid cells).
+## [param elevation_fn]: (coord: Vector2i) → float. If provided, blocks LOS when
+## an intermediate hex has an elevation higher than the interpolated line of sight between from and to.
+## Empty Callable = no elevation check (backward compat).
 func get_line_of_sight(from: Vector2i, to: Vector2i, blocking_terrains: Array[int] = [], elevation_fn: Callable = Callable()) -> bool:
 	if from == to:
 		return true
@@ -435,9 +434,9 @@ func get_line_of_sight(from: Vector2i, to: Vector2i, blocking_terrains: Array[in
 	return true
 
 
-## Retorna los hexes dentro de [param radius] desde [param origin] con línea de visión libre.
-## [param blocking_terrains]: terrenos que interrumpen la LOS (ej. MOUNTAIN, FOREST).
-## [param elevation_fn]: ver get_line_of_sight(). El propio [param origin] siempre se incluye.
+## Returns hexes within [param radius] from [param origin] with clear line of sight.
+## [param blocking_terrains]: terrains that interrupt LOS (e.g., MOUNTAIN, FOREST).
+## [param elevation_fn]: see get_line_of_sight(). The [param origin] itself is always included.
 func get_visible_cells(origin: Vector2i, radius: int, blocking_terrains: Array[int] = [], elevation_fn: Callable = Callable()) -> Array[Vector2i]:
 	var result: Array[Vector2i] = [origin]
 	result.append_array(_get_ring_filtered(origin, radius,
@@ -446,8 +445,8 @@ func get_visible_cells(origin: Vector2i, radius: int, blocking_terrains: Array[i
 	return result
 
 
-## Retorna los hexes dentro de [param radius] que NO tienen LOS desde [param origin].
-## Complemento de get_visible_cells(). Útil para resaltar zonas en sombra.
+## Returns hexes within [param radius] that do NOT have LOS from [param origin].
+## Complement of get_visible_cells(). Useful for highlighting shadowed areas.
 func get_blocked_cells(origin: Vector2i, radius: int, blocking_terrains: Array[int] = [], elevation_fn: Callable = Callable()) -> Array[Vector2i]:
 	var visible := {}
 	for c in get_visible_cells(origin, radius, blocking_terrains, elevation_fn):
@@ -456,7 +455,7 @@ func get_blocked_cells(origin: Vector2i, radius: int, blocking_terrains: Array[i
 		func(coord: Vector2i) -> bool: return not visible.has(coord))
 
 
-## Itera los rings 1..radius desde [param origin] y retorna coords que pasan [param include].
+## Iterates rings 1..radius from [param origin] and returns coords that pass [param include].
 func _get_ring_filtered(origin: Vector2i, radius: int, include: Callable) -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
 	for r in range(1, radius + 1):
@@ -466,8 +465,8 @@ func _get_ring_filtered(origin: Vector2i, radius: int, include: Callable) -> Arr
 	return result
 
 
-## Retorna todos los hexes adyacentes a las unidades en [param unit_coords]
-## que no están ocupados por ninguna unidad. Útil para zona de control táctica.
+## Returns all hexes adjacent to the units in [param unit_coords]
+## that are not occupied by any unit. Useful for tactical zone of control.
 func get_zone_of_control(unit_coords: Array[Vector2i]) -> Array[Vector2i]:
 	var zoc: Dictionary = {}
 	var unit_set: Dictionary = {}

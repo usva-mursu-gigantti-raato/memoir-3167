@@ -1,21 +1,21 @@
 class_name HexBatchRenderer
 extends RefCounted
-## Renderizado batch de hexágonos vía BatchHexLayer (terreno, niebla, highlight).
+## Batch rendering of hexagons via BatchHexLayer (terrain, fog, highlight).
 ##
-## Alternativa al modo nodo-per-hex de HexRenderer para mapas grandes (200×200+):
-## dibuja con [code]_draw()[/code] directo en lugar de instanciar un Area2D por celda.
-## No soporta iconos, texturas inyectadas, overlays ni señales [code]cell_pressed[/code].
+## Alternative to HexRenderer's node-per-hex mode for large maps (200x200+):
+## draws with direct [code]_draw()[/code] instead of instantiating an Area2D per cell.
+## Does not support icons, injected textures, overlays, or [code]cell_pressed[/code] signals.
 ##
-## Uso directo (sin HexRenderer):
+## Direct use (without HexRenderer):
 ## [codeblock]
 ## var palette := HexPalette.new()
 ## var batch := HexBatchRenderer.new(palette, HexGrid.HEX_SIZE)
 ## batch.render(container, grid)
 ## batch.update_fog(container, grid, 0)
-## batch.track_viewport(container)  # llamar en _process
+## batch.track_viewport(container)  # call in _process
 ## [/codeblock]
 ##
-## HexRenderer es nodo-per-hex únicamente — para batch mode, instanciar esta clase directo.
+## HexRenderer is node-per-hex only — for batch mode, instantiate this class directly.
 
 const _BATCH_TERRAIN := "BatchTerrain"
 const _BATCH_FOG := "BatchFog"
@@ -24,8 +24,8 @@ const _BATCH_HIGHLIGHT := "BatchHighlight"
 var _palette: HexPalette
 var _hex_size: float
 var _ignored_callables_hint: PackedStringArray
-# Container guardado en render() para que el handler de palette_changed pueda
-# invalidar las 3 capas sin que el consumer tenga que reenganchar manualmente.
+# Container saved in render() so that the palette_changed handler can
+# invalidate the 3 layers without the consumer having to manually hook them up again.
 var _container: Node2D = null
 
 var _batch_fog_pid: int = 0
@@ -34,9 +34,9 @@ var _batch_los_visible: Array[Vector2i] = []
 var _batch_los_blocked: Array[Vector2i] = []
 
 
-## [param ignored_callables_hint] sirve para que HexRenderer emita el warning de
-## callables ignorados al delegar (cell_icon_fn, tile_visual_fn, overlay_fn).
-## Cuando se instancia HexBatchRenderer directo, dejar vacío.
+## [param ignored_callables_hint] allows HexRenderer to emit a warning for
+## ignored callables when delegating (cell_icon_fn, tile_visual_fn, overlay_fn).
+## When instantiating HexBatchRenderer directly, leave empty.
 func _init(palette: HexPalette, hex_size: float, ignored_callables_hint: PackedStringArray = []) -> void:
 	_palette = palette
 	_hex_size = hex_size
@@ -54,9 +54,9 @@ func _on_palette_changed() -> void:
 			layer.mark_dirty()
 
 
-## Inicializa el modo batch: crea tres BatchHexLayer (terreno, niebla, highlight)
-## en [param container] y descarta cualquier hijo anterior.
-## Después de llamar este método, usar update_fog/update_*_highlight y track_viewport.
+## Initializes batch mode: creates three BatchHexLayers (terrain, fog, highlight)
+## in [param container] and discards any previous children.
+## After calling this method, use update_fog/update_*_highlight and track_viewport.
 func render(container: Node2D, grid: HexGrid) -> void:
 	if not _ignored_callables_hint.is_empty():
 		push_warning("HexBatchRenderer.render(): los siguientes callables serán ignorados en modo batch: %s. Renderizalos en una capa separada (ver examples/large_world)." % ", ".join(_ignored_callables_hint))
@@ -82,15 +82,15 @@ func render(container: Node2D, grid: HexGrid) -> void:
 	container.add_child(highlight)
 
 
-## Marca la capa de niebla batch como sucia para [param player_id].
-## El redraw ocurre en el próximo frame. Llamar después de FogOfWar.update_visibility().
+## Marks the batch fog layer as dirty for [param player_id].
+## Redraw happens on the next frame. Call after FogOfWar.update_visibility().
 func update_fog(_container: Node2D, _grid: HexGrid, player_id: int = 0) -> void:
 	_batch_fog_pid = player_id
 	_mark_dirty(_container, _BATCH_FOG)
 
 
-## Actualiza el highlight batch con el set [param reachable].
-## [param highlighted_hexes] es el mismo cache mutable que en HexRenderer.update_reachable_highlight().
+## Updates the batch highlight with the [param reachable] set.
+## [param highlighted_hexes] is the same mutable cache as in HexRenderer.update_reachable_highlight().
 func update_reachable_highlight(container: Node2D, _grid: HexGrid, reachable: Dictionary, highlighted_hexes: Dictionary) -> void:
 	_batch_highlighted.clear()
 	highlighted_hexes.clear()
@@ -100,8 +100,8 @@ func update_reachable_highlight(container: Node2D, _grid: HexGrid, reachable: Di
 	_mark_dirty(container, _BATCH_HIGHLIGHT)
 
 
-## Actualiza el highlight batch con LOS: azul para visibles, rojo para bloqueados.
-## Limpia el reachable highlight anterior si había uno activo.
+## Updates the batch highlight with LOS: blue for visible, red for blocked.
+## Clears the previous reachable highlight if one was active.
 func update_los_highlight(container: Node2D,
 		visible_coords: Array[Vector2i],
 		blocked_coords: Array[Vector2i] = []) -> void:
@@ -111,14 +111,14 @@ func update_los_highlight(container: Node2D,
 	_mark_dirty(container, _BATCH_HIGHLIGHT)
 
 
-## Marca la capa de terreno batch como sucia después de cambiar el terreno de [param coord].
-## El grid entero se redibuja (batch no tiene granularidad por celda).
+## Marks the batch terrain layer as dirty after changing the terrain at [param coord].
+## The entire grid is redrawn (batch does not have per-cell granularity).
 func update_cell(container: Node2D, _grid: HexGrid, _coord: Vector2i) -> void:
 	_mark_dirty(container, _BATCH_TERRAIN)
 
 
-## Llama check_viewport() en las tres capas batch. Invocar desde _process() del consumidor.
-## Marca dirty automáticamente cuando la cámara se movió más de un hex desde el último redraw.
+## Calls check_viewport() on all three batch layers. Invoke from the consumer's _process().
+## Automatically marks as dirty when the camera has moved more than one hex since the last redraw.
 func track_viewport(container: Node2D) -> void:
 	for layer_name in [_BATCH_TERRAIN, _BATCH_FOG, _BATCH_HIGHLIGHT]:
 		var layer: BatchHexLayer = container.get_node_or_null(layer_name)

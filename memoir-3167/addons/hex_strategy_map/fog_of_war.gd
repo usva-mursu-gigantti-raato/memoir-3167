@@ -1,42 +1,43 @@
 class_name FogOfWar
 extends RefCounted
-## Sistema de niebla de guerra multi-jugador con tres estados.
+## Multiplayer fog of war system with three states.
 ##
-## Gestiona qué hexes están HIDDEN, EXPLORED o VISIBLE para cada jugador.
-## Los estados se almacenan en las HexCell del grid (mark_explored/mark_visible),
-## y en _visible_by_player para poder limpiar la visión activa al inicio de turno.
+## Manages which hexes are HIDDEN, EXPLORED or VISIBLE for each player.
+## States are stored in the grid's HexCells (mark_explored/mark_visible),
+## and in _visible_by_player to be able to clear active vision at the start of a turn.
 ##
-## Flujo típico por turno:
+## Typical turn flow:
 ##   fog.update_visibility(player_id, unit_pos, radius)
 ##   renderer.update_fog(hex_container, grid, player_id)
 ##
-## Para múltiples unidades en el mismo turno, usar update_visibility_multi()
-## que hace un solo pase de limpieza antes de revelar todas las posiciones.
+## For multiple units in the same turn, use update_visibility_multi()
+## which does a single clearing pass before revealing all positions.
 ##
-## LOS (line-of-sight): reveal_with_los() usa HexGrid.get_visible_cells()
-## para bloquear la visión detrás de terrenos específicos.
+## LOS (line-of-sight): reveal_with_los() uses HexGrid.get_visible_cells()
+## to block vision behind specific terrains.
 
-## Emitida cuando el estado de niebla de una celda cambia para un jugador.
-## Útil para actualizar el renderer de forma incremental sin recorrer todo el grid.
+## Emitted when the fog state of a cell changes for a player.
+## Useful for updating the renderer incrementally without traversing the entire grid.
+signal fog_changed(player_id: int, coord: Vector2i, old_state: int, new_state: int)
 signal fog_changed(player_id: int, coord: Vector2i, old_state: int, new_state: int)
 
-## Grid hexagonal asociado. No cambia después de _init.
-## Todos los métodos públicos hacen guard "if grid == null: return" — invariante de clase.
+## Associated hexagonal grid. Does not change after _init.
+## All public methods have a guard "if grid == null: return" — class invariant.
 var grid: HexGrid = null
 var _visible_by_player: Dictionary = {}  # player_id (int) → Dictionary (Vector2i → true)
 var _visibility_radius_fn: Callable
 
 
-## Crea el sistema de niebla vinculado a [param hex_grid].
-## [param visibility_fn]: (unit_level: int) → int — radio de visión según nivel.
-## Si se omite, usa _default_visibility_radius (escala logarítmica, máx 3).
+## Creates the fog system linked to [param hex_grid].
+## [param visibility_fn]: (unit_level: int) → int — vision radius based on level.
+## If omitted, uses _default_visibility_radius (logarithmic scale, max 3).
 func _init(hex_grid: HexGrid, visibility_fn: Callable = Callable()) -> void:
 	grid = hex_grid
 	_visibility_radius_fn = visibility_fn
 
 
-## Retorna el estado de niebla de [param cell] para [param player_id] sin instanciar FogOfWar.
-## Útil cuando solo se necesita leer el estado sin gestionar revelado.
+## Returns the fog state of [param cell] for [param player_id] without instantiating FogOfWar.
+## Useful when only needing to read the state without managing revealing.
 static func get_state(cell: HexCell, player_id: int = 0) -> int:
 	if cell == null:
 		return FogState.HIDDEN
@@ -47,17 +48,17 @@ static func get_state(cell: HexCell, player_id: int = 0) -> int:
 	return FogState.HIDDEN
 
 
-## Retorna el radio de visión para [param unit_level] usando la función inyectada,
-## o _default_visibility_radius si no se proporcionó ninguna.
+## Returns the vision radius for [param unit_level] using the injected function,
+## or _default_visibility_radius if none was provided.
 func get_visibility_radius(unit_level: int) -> int:
 	if _visibility_radius_fn.is_valid():
 		return _visibility_radius_fn.call(unit_level)
 	return _default_visibility_radius(unit_level)
 
 
-## Revela un área circular de [param radius] hexes alrededor de [param center]
-## para [param player_id]. No considera LOS — todos los hexes del anillo quedan VISIBLE.
-## Para LOS, usar reveal_with_los().
+## Reveals a circular area of [param radius] hexes around [param center]
+## for [param player_id]. Does not consider LOS — all hexes in the ring become VISIBLE.
+## For LOS, use reveal_with_los().
 func reveal_around(player_id: int, center: Vector2i, radius: int) -> void:
 	if grid == null:
 		return
@@ -68,10 +69,10 @@ func reveal_around(player_id: int, center: Vector2i, radius: int) -> void:
 			_reveal_coord(player_id, coord)
 
 
-## Revela los hexes visibles desde [param center] con radio [param radius] y LOS.
-## [param blocking_terrains]: terrenos que bloquean la visión (ej. MOUNTAIN, FOREST).
-## [param elevation_fn]: (coord: Vector2i) → float — elevación por celda para LOS con altura.
-## Hexes bloqueados por terreno no quedan VISIBLE (sí pueden quedar EXPLORED de antes).
+## Reveals visible hexes from [param center] with radius [param radius] and LOS.
+## [param blocking_terrains]: terrains that block vision (e.g., MOUNTAIN, FOREST).
+## [param elevation_fn]: (coord: Vector2i) → float — elevation per cell for LOS with height.
+## Hexes blocked by terrain do not become VISIBLE (they might remain EXPLORED from before).
 func reveal_with_los(player_id: int, center: Vector2i, radius: int,
 		blocking_terrains: Array[int] = [], elevation_fn: Callable = Callable()) -> void:
 	if grid == null:
@@ -81,15 +82,15 @@ func reveal_with_los(player_id: int, center: Vector2i, radius: int,
 		_reveal_coord(player_id, coord)
 
 
-## Limpia la visión activa de [param player_id] y revela alrededor de una sola unidad.
-## Para múltiples unidades en el mismo turno, preferir update_visibility_multi().
+## Clears the active vision of [param player_id] and reveals around a single unit.
+## For multiple units in the same turn, prefer update_visibility_multi().
 func update_visibility(player_id: int, unit_pos: Vector2i, radius: int) -> void:
 	update_visibility_multi(player_id, [unit_pos], func(_pos: Vector2i) -> int: return radius)
 
 
-## Limpia la visión activa de [param player_id] y revela alrededor de múltiples posiciones.
-## [param radius_fn]: (pos: Vector2i) → int — radio por posición (permite radios variables).
-## Hace un solo pase de limpieza, más eficiente que llamar update_visibility() N veces.
+## Clears the active vision of [param player_id] and reveals around multiple positions.
+## [param radius_fn]: (pos: Vector2i) → int — radius per position (allows variable radii).
+## Does a single clearing pass, more efficient than calling update_visibility() N times.
 func update_visibility_multi(player_id: int, positions: Array[Vector2i], radius_fn: Callable) -> void:
 	if grid == null:
 		return
@@ -99,7 +100,7 @@ func update_visibility_multi(player_id: int, positions: Array[Vector2i], radius_
 		reveal_around(player_id, pos, radius)
 
 
-## Retorna cuántas celdas del grid exploró [param player_id] (incluyendo las actualmente visibles).
+## Returns how many grid cells [param player_id] has explored (including currently visible ones).
 func get_explored_count(player_id: int = 0) -> int:
 	if grid == null:
 		return 0
@@ -112,9 +113,9 @@ func get_explored_count(player_id: int = 0) -> int:
 	return count
 
 
-## Serializa el estado de niebla a Dictionary compatible con JSON.
-## Solo se guarda _visible_by_player — los explored_by viven en las HexCell
-## y se serializan con HexGrid.serialize().
+## Serializes the fog state to a JSON-compatible Dictionary.
+## Only _visible_by_player is saved — explored_by lives in the HexCells
+## and is serialized with HexGrid.serialize().
 func serialize() -> Dictionary:
 	var visible_data: Array = []
 	for player_id in _visible_by_player:
@@ -130,8 +131,8 @@ static func _parse_coord_pair(pair) -> Vector2i:
 	return HexCell.parse_coord_array(pair)
 
 
-## Reconstruye un FogOfWar desde un Dictionary generado por serialize().
-## [param hex_grid] debe ser el mismo grid (ya deserializado con HexGrid.deserialize()).
+## Reconstructs a FogOfWar from a Dictionary generated by serialize().
+## [param hex_grid] must be the same grid (already deserialized with HexGrid.deserialize()).
 static func deserialize(data: Dictionary, hex_grid: HexGrid) -> FogOfWar:
 	var fog := FogOfWar.new(hex_grid)
 	var visible_data: Array = data.get("visible_by_player", [])
@@ -149,12 +150,12 @@ static func deserialize(data: Dictionary, hex_grid: HexGrid) -> FogOfWar:
 	return fog
 
 
-## Radio por defecto según nivel: escala lentamente (máx 3). Nivel 1 → 1, nivel 3 → 2, nivel 5 → 3.
+## Default radius by level: scales slowly (max 3). Level 1 → 1, level 3 → 2, level 5 → 3.
 static func _default_visibility_radius(unit_level: int) -> int:
 	return mini(1 + floori(float(unit_level - 1) / 2.0), 3)
 
 
-## Captura el estado antes y después de mutar, y emite fog_changed solo si cambió.
+## Captures the state before and after mutating, and emits fog_changed only if it changed.
 func _emit_state_change(cell: HexCell, player_id: int, coord: Vector2i, mutate: Callable) -> void:
 	var old_state := get_state(cell, player_id)
 	mutate.call()

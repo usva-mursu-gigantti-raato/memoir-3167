@@ -1,10 +1,9 @@
 class_name FogState
-## Estados de niebla de guerra.
+## Fog of war states.
 ##
-## Enum compartido por HexCell (almacenamiento) y FogOfWar (lógica de revelado).
-## Usar como entero ordinario en match/comparaciones — no requiere instanciar nada.
-##   HIDDEN   → hex nunca visto por el jugador (oscuridad total).
-##   EXPLORED → hex visto en el pasado pero fuera del rango actual (sombra parcial).
-##   VISIBLE  → dentro del rango de visión actual (completamente revelado).
-
+## Enum shared by HexCell (storage) and FogOfWar (reveal logic).
+## Use as an ordinary integer in match/comparisons — does not require instantiating anything.
+##   HIDDEN   → hex never seen by the player (total darkness).
+##   EXPLORED → hex seen in the past but outside the current range (partial shadow).
+##   VISIBLE  → inside the current vision range (completely revealed).
 enum { HIDDEN, EXPLORED, VISIBLE }

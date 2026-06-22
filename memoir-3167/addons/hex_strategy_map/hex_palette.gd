@@ -1,13 +1,13 @@
 class_name HexPalette
 extends Resource
-## Paleta de colores y resolver de color por celda compartida por HexRenderer y HexBatchRenderer.
+## Color palette and cell color resolver shared by HexRenderer and HexBatchRenderer.
 ##
-## Centraliza la configuración visual que antes vivía dispersa en HexRenderer.
-## Permite que ambos renderers reciban la misma fuente de verdad sin duplicar parámetros.
+## Centralizes the visual configuration that previously lived scattered in HexRenderer.
+## Allows both renderers to receive the same source of truth without duplicating parameters.
 ##
-## Properties exportadas (border_color/width, reachable_color): configurables en .tres.
-## Properties no exportadas (terrain_colors, fog_colors, color_fn): asignables en código —
-## Dictionary y Callable no son serializables como exports de forma confiable.
+## Exported properties (border_color/width, reachable_color): configurable in .tres.
+## Non-exported properties (terrain_colors, fog_colors, color_fn): assignable in code —
+## Dictionary and Callable are not reliably serializable as exports.
 
 const DEFAULT_TERRAIN_COLORS: Dictionary = {
 	HexCell.Terrain.ROAD: Color(0.36, 0.25, 0.20),
@@ -26,12 +26,12 @@ const REACHABLE_COLOR := Color(0.9, 0.85, 0.3, 0.3)
 const BORDER_COLOR := Color(0.2, 0.2, 0.2, 0.5)
 const BORDER_WIDTH := 1.0
 
-## Sentinel que un color_fn puede retornar para indicar "no opino, usá terrain_colors".
-## RGBA negativo no es un color válido — no choca con ningún color real.
+## Sentinel that a color_fn can return to indicate "no opinion, use terrain_colors".
+## Negative RGBA is not a valid color — it does not collide with any real color.
 const SKIP_COLOR := Color(-1, -1, -1, -1)
 
-## Emitida cuando terrain_colors o fog_colors cambian vía setter. Permite a renderers
-## batch invalidar su cache visual sin que el consumer tenga que llamar mark_dirty manualmente.
+## Emitted when terrain_colors or fog_colors change via setter. Allows batch renderers
+## to invalidate their visual cache without the consumer having to call mark_dirty manually.
 signal palette_changed()
 
 @export var border_color: Color = BORDER_COLOR
@@ -46,14 +46,14 @@ var fog_colors: Dictionary = DEFAULT_FOG_COLORS.duplicate():
 	set(value):
 		fog_colors = value
 		palette_changed.emit()
-## Callable opcional `(HexCell) → Color`. Retornar [constant SKIP_COLOR] para
-## delegar al lookup en [member terrain_colors].
+## Optional Callable `(HexCell) → Color`. Return [constant SKIP_COLOR] to
+## delegate to the lookup in [member terrain_colors].
 var color_fn: Callable = Callable()
 
 
-## Resuelve el color de [param cell]. Si [member color_fn] está asignado y no devuelve
-## [constant SKIP_COLOR], usa ese valor. Si no, busca en [member terrain_colors] por
-## terrain id; fallback a [code]Color.GRAY[/code] si no está mapeado.
+## Resolves the color of [param cell]. If [member color_fn] is assigned and does not return
+## [constant SKIP_COLOR], it uses that value. Otherwise, it searches in [member terrain_colors] by
+## terrain id; fallback to [code]Color.GRAY[/code] if it is not mapped.
 func resolve_cell_color(cell: HexCell) -> Color:
 	if color_fn.is_valid():
 		var c: Color = color_fn.call(cell)
@@ -62,7 +62,7 @@ func resolve_cell_color(cell: HexCell) -> Color:
 	return terrain_colors.get(cell.terrain, Color.GRAY)
 
 
-## Crea una paleta con todos los defaults. Equivalente a [code]HexPalette.new()[/code]
-## pero más explícita en intención cuando se usa como factory.
+## Creates a palette with all defaults. Equivalent to [code]HexPalette.new()[/code]
+## but more explicit in intent when used as a factory.
 static func create_default() -> HexPalette:
 	return HexPalette.new()
