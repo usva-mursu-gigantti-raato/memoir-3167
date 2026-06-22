@@ -1,2 +1,60 @@
 # Godot 4+ specific ignores
 .godot/
+
+# Ignore exported games/builds (Adjust these folder names to match your workflow)
+exports/
+builds/
+export/
+build/
+bin/
+
+# =========================
+# C# / Mono Specific
+# =========================
+# (You only need these if you are using the .NET/C# version of Godot)
+
+.mono/
+obj/
+*.csproj.user
+
+# =========================
+# OS Generated Files
+# =========================
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+
+# =========================
+# IDE and Editor Files
+# =========================
+
+# Visual Studio / Rider
+.idea/
+*.sln.DotSettings.user
+
+# Visual Studio Code
+.vscode/*
+# Allow sharing specific, collaborative VS Code settings (Optional)
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Vim / Emacs
+*.swp
+*.swo
+*~
