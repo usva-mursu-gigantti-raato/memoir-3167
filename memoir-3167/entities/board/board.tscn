@@ -1,0 +1,12 @@
+[gd_scene format=3 uid="uid://k5h7ppd70dtp"]
+
+[ext_resource type="Script" uid="uid://8a7you31qpwk" path="res://entities/board/board.gd" id="1_d1srx"]
+
+[node name="Board" type="Node2D" unique_id=1240191303]
+script = ExtResource("1_d1srx")
+
+[node name="Camera2D" type="Camera2D" parent="." unique_id=1205081569]
+
+[node name="HexContainer" type="Node2D" parent="." unique_id=2006374028]
+
+[node name="EdgeContainer" type="Node2D" parent="." unique_id=1256038175]
